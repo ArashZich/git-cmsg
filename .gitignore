@@ -1,0 +1,36 @@
+# Ignore the virtual environment directory
+venv/
+
+# Ignore Python bytecode files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Ignore build artifacts
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Ignore editor/IDE specific files
+.vscode/
+.idea/
+*.swp
+*~
+.DS_Store # macOS specific
+
+# Ignore environment variables file
+.env
+.flaskenv
+
+# Ignore coverage reports
+.coverage
+htmlcov/
+
+# Ignore test and development artifacts
+.pytest_cache/
+.mypy_cache/
+
+# Ignore packaged versions
+*.whl
