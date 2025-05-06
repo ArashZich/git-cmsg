@@ -4,7 +4,6 @@
 
 import sys
 # Import necessary modules and functions
-# get_current_branch_name is called inside ui.py, so it's not needed directly here
 from git_utils import check_git_installed, is_in_git_repository, get_staged_files, perform_commit # Import perform_commit from git_utils
 from messages import get_localized_message, MESSAGES
 # Import all UI prompt functions, including confirm_commit
@@ -13,6 +12,9 @@ from ui import get_commit_type, get_commit_subject, get_commit_scope, get_commit
 # Import prompt-toolkit specific things needed in main (for language selection)
 from prompt_toolkit import prompt
 from prompt_toolkit.validation import Validator, ValidationError
+
+# اضافه کردن import جدید برای تحلیلگر تغییرات
+from change_analyzer import analyze_staged_changes
 
 # --- Language Validator ---
 class LanguageValidator(Validator):
@@ -86,16 +88,18 @@ def main():
         print(f"- {f}")
     print("-" * 30) # Separator
 
+    # --- اضافه کردن تحلیل تغییرات و ایجاد پیشنهادات ---
+    suggestions = analyze_staged_changes(staged_files)
 
     # --- Step 5: Start interactive prompts - Collect all commit message data ---
-    # Get Commit Type
-    commit_type = get_commit_type(chosen_lang)
+    # Get Commit Type with suggestion
+    commit_type = get_commit_type(chosen_lang, suggestions.get('type', ''))
 
-    # Get Commit Subject
-    commit_subject = get_commit_subject(chosen_lang, commit_type)
+    # Get Commit Subject with suggestion
+    commit_subject = get_commit_subject(chosen_lang, commit_type, suggestions.get('subject', ''))
 
-    # Get Commit Scope (Optional, suggestions from staged files)
-    commit_scope = get_commit_scope(chosen_lang, commit_type, commit_subject, staged_files)
+    # Get Commit Scope with suggestion (Optional, suggestions from staged files)
+    commit_scope = get_commit_scope(chosen_lang, commit_type, commit_subject, staged_files, suggestions.get('scope', ''))
 
     # Get Commit Body (Optional, multi-line)
     commit_body = get_commit_body(chosen_lang, commit_type, commit_subject, commit_scope)
@@ -141,11 +145,6 @@ def main():
     else:
         # perform_commit printed the error message
         sys.exit(1) # Exit with an error status
-
-
-    # This line should technically not be reached if the process completes successfully or with error
-    # print("An unexpected state was reached.", file=sys.stderr)
-    # sys.exit(1)
 
 
 if __name__ == "__main__":

@@ -2,10 +2,8 @@
 
 # Import necessary libraries
 from prompt_toolkit import prompt
-from prompt_toolkit.completion import WordCompleter # Not used yet, but kept for potential future use
+from prompt_toolkit.completion import WordCompleter
 from prompt_toolkit.validation import Validator, ValidationError
-# KeyBindings import is REMOVED as requested
-# from prompt_toolkit.key_bindings import KeyBindings
 import sys
 import os
 import re # Import regular expressions for parsing branch name
@@ -46,23 +44,10 @@ class TypeValidator(Validator):
                 message=get_localized_message("invalid_type_choice_number", 'en'), # Use a fallback language
                 cursor_position=len(text))
 
-# --- REMOVE KeyBindings instance and handler as requested ---
-# kb = KeyBindings()
-# @kb.add('?')
-# def _(event):
-#    # ... (Your helper code here) ...
-#    pass
-
 
 # --- Function to get Commit Type ---
-def get_commit_type(language_code):
+def get_commit_type(language_code, suggested_type=""):
     """Prompts user for commit type and returns the selected type string."""
-
-    # --- REMOVE setting language_code on the app if KeyBindings is removed ---
-    # from prompt_toolkit.application import get_app
-    # app = get_app()
-    # app.language_code = language_code # This was used for KeyBindings handler
-
 
     # Ensure this list matches the order and keys in messages.py and TypeValidator
     ordered_type_keys = [
@@ -75,10 +60,21 @@ def get_commit_type(language_code):
         'type_refactor': 'refactor', 'type_docs': 'docs',
         'type_style': 'style', 'type_test': 'test'
     }
-
+    # معکوس نگاشت بالا برای پیدا کردن کلید از نوع کامیت
+    type_string_to_key = {v: k for k, v in type_key_to_string.items()}
 
     # Build the prompt message with numbered options
-    prompt_message = f"{get_localized_message('prompt_type', language_code)}\n" # Main question
+    prompt_message = f"{get_localized_message('prompt_type', language_code)}\n"
+    
+    # اضافه کردن پیشنهاد به پیام، اگر وجود داشته باشد - بدون شماره
+    if suggested_type and suggested_type in type_string_to_key:
+        suggested_key = type_string_to_key[suggested_type]
+        suggested_desc = get_localized_message(suggested_key, language_code)
+        
+        suggestion_message = get_localized_message('suggestion', language_code)
+        prompt_message += f"{suggestion_message}: {suggested_desc}\n"
+    
+    # ادامه با نمایش گزینه‌ها
     for i, key in enumerate(ordered_type_keys):
         # Get localized description for each type
         localized_type_desc = get_localized_message(key, language_code)
@@ -91,10 +87,7 @@ def get_commit_type(language_code):
         try:
             # Use prompt from prompt_toolkit
             user_input = prompt(
-                prompt_message, # The question with options
-                validator=TypeValidator() # Use our custom validator
-                # REMOVE key_bindings argument as kb is removed
-                # key_bindings=kb
+                prompt_message # The question with options
             ).strip()
 
             # Convert valid input (which passed validation) to the actual type string
@@ -108,27 +101,24 @@ def get_commit_type(language_code):
 
 
 # --- Function to get Commit Subject ---
-def get_commit_subject(language_code, commit_type):
+def get_commit_subject(language_code, commit_type, suggested_subject=""):
     """Prompts user for commit subject."""
 
-    # --- REMOVE setting language_code on the app if KeyBindings is removed ---
-    # from prompt_toolkit.application import get_app
-    # app = get_app()
-    # app.language_code = language_code # This was used for KeyBindings handler
-
-
     # Build the prompt message
-    prompt_message = (
-        f"Type: {commit_type}\n" # Display the selected type for context
-        f"Subject: {get_localized_message('prompt_subject', language_code)}\n" # Subject question (localized)
-        f"{get_localized_message('hint_subject', language_code)}\n" # Subject guideline hint (localized)
-        f"> " # Input indicator
-    )
+    prompt_message = f"Type: {commit_type}\n"
+    prompt_message += f"{get_localized_message('prompt_subject', language_code)}\n"
+    
+    # اضافه کردن پیشنهاد به پیام، اگر وجود داشته باشد
+    if suggested_subject:
+        suggestion_message = get_localized_message('suggestion', language_code)
+        prompt_message += f"{suggestion_message}: {suggested_subject}\n"
+    
+    # اضافه کردن راهنمای موضوع
+    prompt_message += f"{get_localized_message('hint_subject', language_code)}\n"
+    prompt_message += "> " # Input indicator
 
-    # Get user input using prompt_toolkit (single line by default)
-    # REMOVE key_bindings argument
-    user_input = prompt(prompt_message #, key_bindings=kb
-                       ).strip()
+    # Get user input using prompt_toolkit
+    user_input = prompt(prompt_message).strip()
 
     return user_input
 
@@ -140,13 +130,9 @@ def generate_scope_suggestions(staged_files):
 
     for filepath in staged_files:
         # Split path into components
-        # os.path.normpath handles different separators (\ and /)
-        # os.path.dirname gets the directory part (e.g., 'src/components')
-        # Split the directory path into parts (e.g., ['src', 'components'])
         path_parts = os.path.normpath(os.path.dirname(filepath)).split(os.sep)
 
         # Add parent directories and cumulative paths as suggestions
-        # Iterate through parts to create cumulative scopes (e.g., 'src', 'src/components')
         current_scope_parts = []
         for part in path_parts:
             if part and part != '.': # Ignore empty parts and current directory '.'
@@ -154,50 +140,46 @@ def generate_scope_suggestions(staged_files):
                 # Add the cumulative path as a suggestion (e.g., ['src', 'components'] -> 'src/components')
                 suggestions.add('/'.join(current_scope_parts)) # Use '/' as standard scope separator
 
-
     # Convert set to sorted list and limit the number of suggestions
     sorted_suggestions = sorted(list(suggestions))
-    # Limit to a reasonable number, e.g., first 10 or 15
-    return sorted_suggestions[:15]
+    # Limit to a reasonable number, e.g., first 5 (کاهش تعداد پیشنهادها)
+    return sorted_suggestions[:5]
 
 
 # --- Function to get Commit Scope (with more guidance) ---
-def get_commit_scope(language_code, commit_type, commit_subject, staged_files):
+def get_commit_scope(language_code, commit_type, commit_subject, staged_files, suggested_scope=""):
     """Prompts user for commit scope, providing suggestions based on staged files."""
 
     # Generate suggestions based on staged files
     suggestions = generate_scope_suggestions(staged_files)
 
     # --- Build the prompt message with improved structure ---
-    prompt_message_parts = [
-        f"Type: {commit_type}", # Display previous info
-        f"Subject: {commit_subject}",
-        f"{get_localized_message('prompt_scope', language_code)}\n", # Main question (localized)
+    prompt_message = f"Type: {commit_type}\n"
+    prompt_message += f"Subject: {commit_subject}\n"
+    prompt_message += f"{get_localized_message('prompt_scope', language_code)}\n"
+    
+    # اضافه کردن پیشنهاد به پیام، اگر وجود داشته باشد
+    if suggested_scope:
+        suggestion_message = get_localized_message('suggestion', language_code)
+        prompt_message += f"{suggestion_message}: {suggested_scope}\n"
 
-        # --- ADDED GUIDANCE FOR SCOPE (using new message keys and separating English/Persian) ---
-        f"{get_localized_message('explanation_header_en', language_code)}\n", # Explanation header (English)
-        f"{get_localized_message('scope_explanation_en', language_code)}\n", # English explanation (multi-line)
-        f"\n", # Blank line separator between English and Persian explanations
-        f"{get_localized_message('explanation_header_fa', language_code)}\n", # Explanation header (Persian)
-        f"{get_localized_message('scope_explanation_fa', language_code)}\n", # Persian explanation (multi-line)
-        # --- END ADDED GUIDANCE ---
-    ]
+    # --- توضیحات کوتاه‌تر و مختصرتر (فقط به زبان کاربر) ---
+    if language_code == 'fa':
+        prompt_message += f"{get_localized_message('scope_explanation_short_fa', language_code)}\n"
+    else:
+        prompt_message += f"{get_localized_message('scope_explanation_short_en', language_code)}\n"
 
     # Add suggestions if any
     if suggestions:
         suggestions_header = get_localized_message('suggestions_header', language_code)
         # Format suggestions as a comma-separated list
-        prompt_message_parts.append(f"\n{suggestions_header}: {', '.join(suggestions)}\n") # Add blank line before suggestions
+        prompt_message += f"{suggestions_header}: {', '.join(suggestions)}\n"
 
     # Add the optional/skip guideline
-    prompt_message_parts.append(f"\n{get_localized_message('hint_skip', language_code)}\n") # Add blank line before skip hint
-    prompt_message_parts.append("> ") # Input indicator
+    prompt_message += f"{get_localized_message('hint_skip', language_code)}\n"
+    prompt_message += "> " # Input indicator
 
-    # Join all parts to create the final prompt string
-    prompt_message = "".join(prompt_message_parts)
-
-
-    # Get user input using prompt_toolkit (single line)
+    # Get user input using prompt_toolkit
     user_input = prompt(prompt_message).strip()
 
     return user_input
@@ -207,21 +189,13 @@ def get_commit_scope(language_code, commit_type, commit_subject, staged_files):
 def get_commit_body(language_code, commit_type, commit_subject, commit_scope):
     """Prompts user for commit body (multi-line input)."""
 
-    # --- REMOVE setting language_code on the app if KeyBindings is removed ---
-    # from prompt_toolkit.application import get_app
-    # app = get_app()
-    # app.language_code = language_code # This was used for KeyBindings handler
-
     # Build the prompt message
-    prompt_message_parts = [
-        f"Type: {commit_type}", # Display previous info
-        f"Subject: {commit_subject}",
-        f"Scope: {commit_scope if commit_scope else '(skipped)'}\n", # Show scope or skipped
-        f"{get_localized_message('prompt_body', language_code)}\n", # Body question (localized)
-        f"{get_localized_message('hint_body', language_code)}\n", # Body guideline hint (localized)
-        f"> ", # Input indicator
-    ]
-    prompt_message = "".join(prompt_message_parts)
+    prompt_message = f"Type: {commit_type}\n"
+    prompt_message += f"Subject: {commit_subject}\n"
+    prompt_message += f"Scope: {commit_scope if commit_scope else '(skipped)'}\n"
+    prompt_message += f"{get_localized_message('prompt_body', language_code)}\n"
+    prompt_message += f"{get_localized_message('hint_body', language_code)}\n"
+    prompt_message += "> " # Input indicator
 
     # Use prompt_toolkit.prompt with multiline=True for multi-line input
     user_input = prompt(prompt_message, multiline=True).strip()
@@ -238,16 +212,10 @@ def generate_issue_suggestions_from_branch(branch_name):
     if not branch_name or branch_name == 'HEAD':
         return []
 
-    # Common patterns in branch names for issue numbers:
-    # feature/#123-description, fix/issue-456, bugfix/789, chore_101_task
-    # Regex finds sequences of digits (\d+) that are preceded by a non-digit character or start of string ([^0-9]|^)
-    # and potentially followed by a non-digit or end of string ([^0-9]|$)
-    # This regex looks for numbers that are likely standalone issue numbers or part of issue references.
-    # It captures the digits in groups 1 or 4.
+    # Common patterns in branch names for issue numbers
     issue_number_pattern = re.compile(r'[^0-9](\d+)([^0-9]|$)|(^(\d+))')
 
     # Find all potential issue numbers in the branch name
-    # findall returns a list of tuples for groups. We need to flatten it and filter for actual digits.
     found_matches = issue_number_pattern.findall(branch_name)
     numbers = []
     for match in found_matches:
@@ -261,12 +229,10 @@ def generate_issue_suggestions_from_branch(branch_name):
     for num_str in numbers:
         suggestions.add(f"#{num_str}") # Suggest format like #123
 
-    # You could add logic here to check if these issue numbers exist in an issue tracker API (more complex!)
-
     # Convert set to sorted list
     sorted_suggestions = sorted(list(suggestions))
-    # Limit to a reasonable number, e.g., first 5
-    return sorted_suggestions[:5]
+    # Limit to a reasonable number, e.g., first 3 (کاهش تعداد پیشنهادها)
+    return sorted_suggestions[:3]
 
 
 # --- Function to get Commit Issues (with more guidance) ---
@@ -279,39 +245,31 @@ def get_commit_issues(language_code, commit_type, commit_subject, commit_scope, 
     # Generate issue suggestions based on branch name
     suggestions = generate_issue_suggestions_from_branch(branch_name)
 
-
     # --- Build the prompt message with improved structure ---
-    prompt_message_parts = [
-        f"Type: {commit_type}", # Display previous info
-        f"Subject: {commit_subject}",
-        f"Scope: {commit_scope if commit_scope else '(skipped)'}\n", # Show scope or skipped
-        f"Body: {'(skipped)' if not commit_body.strip() else '...'}\n", # Show if body was entered or skipped ('...' if not empty)
-        f"{get_localized_message('prompt_issues', language_code)}\n", # Issues question (localized)
+    prompt_message = f"Type: {commit_type}\n"
+    prompt_message += f"Subject: {commit_subject}\n"
+    prompt_message += f"Scope: {commit_scope if commit_scope else '(skipped)'}\n"
+    prompt_message += f"Body: {'(skipped)' if not commit_body.strip() else '...'}\n"
+    prompt_message += f"{get_localized_message('prompt_issues', language_code)}\n"
 
-        # --- ADDED GUIDANCE FOR ISSUES (using new message keys and separating English/Persian) ---
-        f"\n{get_localized_message('explanation_header_en', language_code)}\n", # Explanation header (English)
-        f"{get_localized_message('issues_explanation_en', language_code)}\n", # English explanation (multi-line)
-        f"\n{get_localized_message('explanation_header_fa', language_code)}\n", # Explanation header (Persian)
-        f"{get_localized_message('issues_explanation_fa', language_code)}\n", # Persian explanation (multi-line)
-        # --- END ADDED GUIDANCE ---
-    ]
+    # --- توضیحات کوتاه‌تر و مختصرتر (فقط به زبان کاربر) ---
+    if language_code == 'fa':
+        prompt_message += f"{get_localized_message('issues_explanation_short_fa', language_code)}\n"
+    else:
+        prompt_message += f"{get_localized_message('issues_explanation_short_en', language_code)}\n"
 
     # Add suggestions if any
     if suggestions:
         suggestions_header = get_localized_message('suggestions_header', language_code)
-        prompt_message_parts.append(f"\n{suggestions_header}: {', '.join(suggestions)}\n") # Add blank line before suggestions
+        prompt_message += f"{suggestions_header}: {', '.join(suggestions)}\n"
 
-    # Add the optional/skip and example format guidelines
-    prompt_message_parts.append(f"\n{get_localized_message('hint_skip', language_code)}\n") # Add blank line before skip hint
-    prompt_message_parts.append(f"{get_localized_message('hint_issues', language_code)}\n") # Localized hint for format (e.g., Closes #123)
-    prompt_message_parts.append("> ") # Input indicator
+    # Add the optional/skip guideline and example format
+    prompt_message += f"{get_localized_message('hint_skip', language_code)}\n"
+    prompt_message += f"{get_localized_message('hint_issues', language_code)}\n"
+    prompt_message += "> " # Input indicator
 
-    # Join all parts to create the final prompt string
-    prompt_message = "".join(prompt_message_parts)
-
-
-    # --- Get user input using prompt_toolkit ---
-    user_input = prompt(prompt_message).strip() # Single line input
+    # Get user input using prompt_toolkit
+    user_input = prompt(prompt_message).strip()
 
     return user_input
 
@@ -321,16 +279,6 @@ def confirm_commit(commit_message_string, language_code):
     """
     Displays the final commit message preview and asks for user confirmation.
     Allows editing the message externally.
-
-    Args:
-        commit_message_string (str): The formatted commit message string.
-        language_code (str): The chosen language code ('en' or 'fa').
-
-    Returns:
-        str: The confirmed or edited commit message string, or None if aborted.
-             Returns the original string if 'y' is chosen.
-             Returns the edited string if 'e' is chosen and editing is successful.
-             Returns None if 'n' or Ctrl+D is chosen.
     """
     while True: # Loop until user confirms, aborts, or edits successfully
         # Display the formatted message preview
@@ -342,10 +290,11 @@ def confirm_commit(commit_message_string, language_code):
         print(commit_message_string) # The actual message
         print(f"{'-' * 30}\n") # Separator
 
-
         # Get user input for confirmation
         try:
-            user_choice = prompt(confirm_prompt_text).strip().lower()
+            user_choice = prompt(
+                f"{confirm_prompt_text} "
+            ).strip().lower()
 
             if user_choice == 'y':
                 return commit_message_string # User confirms, return the current message
@@ -360,18 +309,13 @@ def confirm_commit(commit_message_string, language_code):
                 if edited_message is not None:
                      # If editing was successful, update the message and loop to show preview again
                      commit_message_string = edited_message
-                     # Indicate returning to preview loop
-                     # print(get_localized_message('proceeding', language_code, lang=language_code)) # Maybe redundant here
-                     # Loop continues to show the new preview
                 else:
                      # If editing failed or was cancelled in editor, prompt again
                      print("Editing cancelled or failed. Please try again or choose y/n.", file=sys.stderr)
-                     # Loop continues to ask for confirmation
 
             else:
                 # Invalid input, prompt again
                 print("Invalid choice. Please enter 'y', 'n', or 'e'.", file=sys.stderr)
-                # Loop continues to ask for confirmation
 
         except EOFError: # User pressed Ctrl+D
             print("\nCommit process aborted by user.", file=sys.stderr)
@@ -394,9 +338,6 @@ def edit_message_externally(initial_message):
              'nano' # Default to nano if no editor is set
 
     # Create a temporary file to write the message to
-    # suffix=".gitmessage" is a convention, helps some editors with syntax highlighting
-    # delete=False means the file is not automatically deleted when closed, we delete it manually in finally
-    # encoding='utf-8' ensures proper handling of international characters
     with tempfile.NamedTemporaryFile(mode='w+', suffix=".gitmessage", delete=False, encoding='utf-8') as tmp_file:
         tmp_file_path = tmp_file.name
         tmp_file.write(initial_message)
@@ -404,11 +345,6 @@ def edit_message_externally(initial_message):
 
     try:
         # Open the editor with the temporary file
-        # Use subprocess.run which is generally preferred over subprocess.call or os.system
-        # shell=True is often needed for the system to find the editor command correctly,
-        # especially if it has spaces or is an alias/function in the shell.
-        # check=True will raise CalledProcessError if the editor command fails (e.g., not found, editor exits with error)
-        # The user interacts with the editor directly in the terminal, so capture_output=False (default) is fine.
         subprocess.run(f'{editor} "{tmp_file_path}"', shell=True, check=True)
 
         # Read the edited content back from the temporary file
@@ -422,7 +358,7 @@ def edit_message_externally(initial_message):
          print(f"Error: Editor command '{editor}' not found. Please set GIT_EDITOR, VISUAL, or EDITOR environment variable, or install a default editor like nano.", file=sys.stderr)
          return None # Indicate editing failed
     except subprocess.CalledProcessError:
-         # Editor was run but exited with a non-zero status (e.g., user saved and exited with an error status, though most editors exit 0 on save)
+         # Editor was run but exited with a non-zero status
          print("Editor exited with an error. Editing may have failed or was cancelled improperly.", file=sys.stderr)
          return None # Indicate editing failed
     except Exception as e:
@@ -432,12 +368,5 @@ def edit_message_externally(initial_message):
 
     finally:
         # Ensure the temporary file is deleted regardless of success, failure, or exceptions
-        # Use os.unlink for reliability across OSes
         if os.path.exists(tmp_file_path):
             os.unlink(tmp_file_path) # Delete the temporary file
-
-
-# --- Placeholder functions for next prompts (remain the same) ---
-# get_commit_issues is already implemented above.
-# def get_commit_issues(language_code, commit_type, commit_subject, commit_scope, commit_body):
-#    ...

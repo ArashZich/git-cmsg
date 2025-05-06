@@ -38,6 +38,8 @@ MESSAGES = {
 
         # --- Suggestions Header ---
         "suggestions_header": "Suggestions", # Used by ui.py (e.g., for scope, issues)
+        # --- New message for suggestion based on analysis ---
+        "suggestion": "Suggestion",
 
         # --- Guideline Hints (Used by ui.py) ---
         "hint_subject": "Guideline: Start with imperative verb, max 50-72 chars.",
@@ -71,6 +73,8 @@ MESSAGES = {
         # --- ADDED Explanation Messages ---
         "explanation_header_en": "Explanation (English):",
         "explanation_header_fa": "توضیح (فارسی):",
+        
+        # --- Full explanation messages (original) ---
         "scope_explanation_en": """Scope defines the PART of the codebase affected by this change.
 It adds context to the commit message header.
 Examples: 'auth', 'UI', 'api', 'components/button', 'docs'""",
@@ -83,6 +87,10 @@ You can also add lines like 'Co-authored-by: Name <email>' here.""",
         "issues_explanation_fa": """از این بخش برای لینک دادن به تیکت‌ها یا مسائل مرتبط در Issue Tracker یا اضافه کردن اطلاعات دیگر به پاورقی پیام استفاده کنید.
 فرمت‌های رایج: 'Closes #123', 'Fixes #456', 'Ref #789'.
 همچنین می‌توانید خطوطی مانند 'Co-authored-by: Name <email>' در اینجا اضافه کنید.""",
+        
+        # --- Short explanation messages (new) ---
+        "scope_explanation_short_en": "Scope: Part of codebase affected (e.g., 'auth', 'ui')",
+        "issues_explanation_short_en": "Link issues with formats like 'Closes #123' or 'Fixes #456'",
     },
     "fa": {
         # --- Initial Messages and Checks ---
@@ -117,6 +125,8 @@ You can also add lines like 'Co-authored-by: Name <email>' here.""",
 
          # --- Suggestions Header ---
         "suggestions_header": "پیشنهادات", # Used by ui.py (e.g., for scope, issues)
+        # --- New message for suggestion based on analysis ---
+        "suggestion": "پیشنهاد",
 
         # --- Guideline Hints (Used by ui.py) ---
         "hint_subject": "راهنما: با فعل امری شروع شود، حداکثر ۵۰-۷۲ حرف.",
@@ -150,6 +160,8 @@ You can also add lines like 'Co-authored-by: Name <email>' here.""",
         # --- ADDED Explanation Messages ---
         "explanation_header_en": "Explanation (English):",
         "explanation_header_fa": "توضیح (فارسی):",
+        
+        # --- Full explanation messages (original) ---
         "scope_explanation_en": """Scope defines the PART of the codebase affected by this change.
 It adds context to the commit message header.
 Examples: 'auth', 'UI', 'api', 'components/button', 'docs'""",
@@ -162,6 +174,10 @@ You can also add lines like 'Co-authored-by: Name <email>' here.""",
         "issues_explanation_fa": """از این بخش برای لینک دادن به تیکت‌ها یا مسائل مرتبط در Issue Tracker یا اضافه کردن اطلاعات دیگر به پاورقی پیام استفاده کنید.
 فرمت‌های رایج: 'Closes #123', 'Fixes #456', 'Ref #789'.
 همچنین می‌توانید خطوطی مانند 'Co-authored-by: Name <email>' در اینجا اضافه کنید.""",
+        
+        # --- Short explanation messages (new) ---
+        "scope_explanation_short_fa": "محدوده: بخشی از کد که تغییر کرده (مثال: 'ورود'، 'رابط کاربری')",
+        "issues_explanation_short_fa": "برای لینک به تیکت‌ها از فرمت‌هایی مانند 'Closes #123' استفاده کنید",
     }
 }
 
@@ -177,9 +193,6 @@ def get_localized_message(key, language_code, **kwargs):
     if lang_messages is None:
         # If language code is invalid or not found, use English
         lang_messages = MESSAGES['en']
-        # Optionally print a warning if the language code itself was invalid
-        # print(f"Warning: Language code '{language_code}' not supported. Using English.", file=sys.stderr)
-
 
     message = lang_messages.get(key)
     if message is None:
