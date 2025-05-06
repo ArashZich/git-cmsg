@@ -50,76 +50,40 @@ def get_staged_files():
     """Runs git status --porcelain and returns a list of staged files."""
     staged_files = []
     try:
-        # Run git status --porcelain v1 format (simpler to parse for basic info)
-        # check=False because we handle the return code manually (e.g., if not in a repo,
-        # although that should be caught by is_in_git_repository)
+        # استفاده از git diff --cached --name-only به جای git status --porcelain
+        # این دستور مستقیماً فایل‌های stage شده رو برمی‌گردونه
         result = subprocess.run(
-            ['git', 'status', '--porcelain', '-z'], # Use -z to handle filenames with spaces better
+            ['git', 'diff', '--cached', '--name-only'],
             check=False,
             capture_output=True,
-            text=True, # Get output as text (handles UTF-8 on modern systems)
-            cwd=os.getcwd() # Ensure command runs in current directory
+            text=True,
+            cwd=os.getcwd() # اجرا در دایرکتوری فعلی
         )
 
-        # Handle potential errors from git status
+        # بررسی خطاهای احتمالی
         if result.returncode != 0:
-             # This shouldn't happen if is_in_git_repository passed, but as a safeguard
-             print(f"Error running 'git status --porcelain':\n{result.stderr}", file=sys.stderr)
-             sys.exit(1) # Exit the whole program
+             # این نباید اتفاق بیفته اگر is_in_git_repository موفق بوده، اما به عنوان یک تدبیر ایمنی
+             print(f"Error running 'git diff --cached --name-only':\n{result.stderr}", file=sys.stderr)
+             sys.exit(1) # خروج کامل از برنامه
 
+        # پارس کردن خروجی - هر خط یک فایل stage شده است
+        staged_files = [line.strip() for line in result.stdout.split('\n') if line.strip()]
 
-        # Parse the --porcelain -z output
-        # -z uses a null byte instead of newline as separator
-        # Each record is typically: XY file_path\x00
-        # R/C records are: RX original_path\x00new_path\x00
-        # We split by null byte, the last item is empty after the final null byte
-        entries = result.stdout.strip('\x00').split('\x00')
-
-        i = 0
-        while i < len(entries):
-            entry = entries[i]
-            if not entry: # Skip empty entries (e.g., resulting from split)
-                i += 1
-                continue
-
-            status = entry[:2] # Get the status codes (e.g., "A ", " M", "AM", "R ")
-            filepath = entry[3:] # Get the rest of the entry (filename(s))
-
-            # Check if the file is staged (Index status - first char - is not ' ')
-            if status[0] != ' ':
-                if status[0] in ['R', 'C']:
-                    # For R and C, the next entry is the *new* path after the original path in the current entry
-                    original_path = filepath # This is the original path part of the R/C entry
-                    i += 1 # Move to the next entry which contains the new path
-                    if i < len(entries):
-                         filepath = entries[i] # The new path for R/C
-                    else:
-                         print(f"Warning: Unexpected end of porcelain output after R/C entry: {entry}", file=sys.stderr)
-                         # Fallback to original path or skip? Let's skip for safety in parsing.
-                         i += 1 # Ensure we move past the problematic state
-                         continue # Skip this entry
-
-                # At this point, filepath contains the relevant path (new path for R/C, only path for others)
-                staged_files.append(filepath)
-
-            i += 1 # Move to the next entry (or the one after the new path for R/C)
-
-
-        # If no files are staged, inform the user and exit successfully
+        # اگر هیچ فایلی stage نشده، به کاربر اطلاع بده و خارج شو
         if not staged_files:
-             # Use sys.stderr for user-facing info that isn't part of standard output
+             # استفاده از sys.stderr برای اطلاعات کاربر که بخشی از خروجی استاندارد نیست
              print("No changes are staged. Please stage changes (`git add .`) before committing.", file=sys.stderr)
-             sys.exit(0) # Exit with status 0 (success)
+             sys.exit(0) # خروج با وضعیت 0 (موفقیت)
 
         return staged_files
 
     except FileNotFoundError:
-        # Should have been caught by check_git_installed
+        # باید توسط check_git_installed قبلاً گرفته شده باشه
         print("Error: 'git' command not found during status check.", file=sys.stderr)
-        sys.exit(1) # Exit the whole program
+        sys.exit(1) # خروج کامل از برنامه
     except Exception as e:
         print(f"An unexpected error occurred while getting git status: {e}", file=sys.stderr)
-        sys.exit(1) # Exit the whole program
+        sys.exit(1) # خروج کامل از برنامه
 
 # --- Function to get current branch name ---
 def get_current_branch_name():
@@ -212,8 +176,17 @@ def perform_commit(commit_message_string):
     except subprocess.CalledProcessError as e:
          # This happens if git commit fails (e.g., no changes added, conflicts, hooks failed)
          print(f"Error executing git commit:\n{e.stderr.strip()}", file=sys.stderr)
-         # print(f"Git command: {' '.join(e.cmd)}", file=sys.stderr) # Optional: print the command that failed
-         # print(f"Return code: {e.returncode}", file=sys.stderr) # Optional: print return code
+         # مشکل اینجاست: e.stderr خالی یا None ممکنه باشه در بعضی موارد
+         # اضافه کردن چک بیشتر برای نمایش بهتر خطا:
+         if e.stderr and e.stderr.strip():
+             print(f"Error details:\n{e.stderr.strip()}", file=sys.stderr)
+         elif e.stdout and e.stdout.strip():
+             print(f"Command output:\n{e.stdout.strip()}", file=sys.stderr)
+         else:
+             print(f"Git command failed with return code: {e.returncode}", file=sys.stderr)
+         
+         # چاپ دستور دقیق گیت برای اشکال‌زدایی بهتر
+         print(f"Git command attempted: git commit -F {tmp_file_path}", file=sys.stderr)
          return False # Indicate failure
     except Exception as e:
         print(f"An unexpected error occurred during commit execution: {e}", file=sys.stderr)
@@ -224,7 +197,6 @@ def perform_commit(commit_message_string):
         # Use os.unlink for reliability across OSes
         if os.path.exists(tmp_file_path):
             os.unlink(tmp_file_path) # Delete the temporary file
-
 
 # Note: We don't need the if __name__ == "__main__": block in utility files
 # because they are meant to be imported and used by other scripts.
