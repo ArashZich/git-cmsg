@@ -34,3 +34,5 @@ htmlcov/
 
 # Ignore packaged versions
 *.whl
+
+packaging/
