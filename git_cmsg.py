@@ -6,11 +6,12 @@ import sys
 
 # Define the application version
 # شماره نسخه برنامه را در اینجا تعریف می کنیم
-__version__ = "0.2.0"
+__version__ = "0.2.1"
 
 # Import necessary modules and functions
 from git_utils import check_git_installed, is_in_git_repository, get_staged_files, perform_commit
-from messages import get_localized_message, MESSAGES # MESSAGES برای انتخاب زبان اولیه و پاس دادن به help_handler نیاز است
+# MESSAGES برای انتخاب زبان اولیه و پاس دادن به help_handler نیاز است
+from messages import get_localized_message, MESSAGES
 # Import the new general argument handler function
 # ایمپورت کردن تابع جدید handle_arguments از فایل help_handler.py
 from help_handler import handle_arguments
@@ -32,10 +33,11 @@ class LanguageValidator(Validator):
     def validate(self, document):
         text = document.text.strip().lower()
         if text in ['en', 'fa']:
-            return # Valid input
+            return  # Valid input
         else:
             raise ValidationError(
-                message=get_localized_message('invalid_lang', 'en') + " / " + get_localized_message('invalid_lang', 'fa'),
+                message=get_localized_message(
+                    'invalid_lang', 'en') + " / " + get_localized_message('invalid_lang', 'fa'),
                 cursor_position=len(document.text))
 
 # تابع display_help حذف شده و به help_handler.py منتقل شده است
@@ -62,14 +64,14 @@ def main():
         sys.exit(1)
 
     if not is_in_git_repository():
-         sys.exit(1)
+        sys.exit(1)
 
     print("گیت نصب است و شما در یک مخزن گیت قرار دارید.")
 
     # --- مرحله 4: انتخاب زبان (با استفاده از prompt_toolkit) ---
     # این بخش همچنان پس از بررسی پرچم راهنما و نسخه در handle_arguments اجرا می‌شود
     # و از prompt_toolkit برای ورودی تعاملی استفاده می‌کند.
-    chosen_lang = 'en' # زبان پیش‌فرض قبل از انتخاب
+    chosen_lang = 'en'  # زبان پیش‌فرض قبل از انتخاب
     while True:
         try:
             lang_input = prompt(
@@ -78,17 +80,16 @@ def main():
             ).strip().lower()
 
             if lang_input in ['en', 'fa']:
-                 chosen_lang = lang_input # تنظیم زبان انتخاب شده
-                 break # خروج از حلقه
-        except EOFError: # کاربر Ctrl+D را حین prompt زد
-             print("\nعملیات کامیت توسط کاربر لغو شد.", file=sys.stderr)
-             sys.exit(1)
-        except Exception as e: # گرفتن خطاهای غیرمنتظره دیگر حین انتخاب زبان
-             print(f"خطایی هنگام انتخاب زبان رخ داد: {e}", file=sys.stderr)
-             sys.exit(1)
+                chosen_lang = lang_input  # تنظیم زبان انتخاب شده
+                break  # خروج از حلقه
+        except EOFError:  # کاربر Ctrl+D را حین prompt زد
+            print("\nعملیات کامیت توسط کاربر لغو شد.", file=sys.stderr)
+            sys.exit(1)
+        except Exception as e:  # گرفتن خطاهای غیرمنتظره دیگر حین انتخاب زبان
+            print(f"خطایی هنگام انتخاب زبان رخ داد: {e}", file=sys.stderr)
+            sys.exit(1)
 
     print(get_localized_message("proceeding", chosen_lang, lang=chosen_lang))
-
 
     # --- مرحله 3: دریافت فایل های stage شده و نمایش آنها ---
     staged_files = get_staged_files()
@@ -103,11 +104,14 @@ def main():
 
     # --- مرحله 5: شروع prompt های تعاملی - جمع آوری تمام داده های پیام کامیت ---
     commit_type = get_commit_type(chosen_lang, suggestions.get('type', ''))
-    commit_subject = get_commit_subject(chosen_lang, commit_type, suggestions.get('subject', ''))
-    commit_scope = get_commit_scope(chosen_lang, commit_type, commit_subject, staged_files, suggestions.get('scope', ''))
-    commit_body = get_commit_body(chosen_lang, commit_type, commit_subject, commit_scope)
-    commit_issues = get_commit_issues(chosen_lang, commit_type, commit_subject, commit_scope, commit_body)
-
+    commit_subject = get_commit_subject(
+        chosen_lang, commit_type, suggestions.get('subject', ''))
+    commit_scope = get_commit_scope(
+        chosen_lang, commit_type, commit_subject, staged_files, suggestions.get('scope', ''))
+    commit_body = get_commit_body(
+        chosen_lang, commit_type, commit_subject, commit_scope)
+    commit_issues = get_commit_issues(
+        chosen_lang, commit_type, commit_subject, commit_scope, commit_body)
 
     # --- مرحله 6: فرمت کردن داده های جمع آوری شده به رشته نهایی پیام کامیت ---
     commit_data = {
@@ -117,8 +121,8 @@ def main():
         'body': commit_body,
         'issues': commit_issues
     }
-    final_commit_message = message_formatter.format_message(commit_data, staged_files, chosen_lang)
-
+    final_commit_message = message_formatter.format_message(
+        commit_data, staged_files, chosen_lang)
 
     # --- مرحله 7: نمایش پیش نمایش پیام فرمت شده و درخواست تایید نهایی ---
     confirmed_message = confirm_commit(final_commit_message, chosen_lang)
@@ -128,9 +132,9 @@ def main():
 
     # --- مرحله 8: اجرای دستور git commit با پیام نهایی ---
     if perform_commit(confirmed_message):
-        sys.exit(0) # خروج موفقیت آمیز
+        sys.exit(0)  # خروج موفقیت آمیز
     else:
-        sys.exit(1) # خروج با وضعیت خطا
+        sys.exit(1)  # خروج با وضعیت خطا
 
 
 if __name__ == "__main__":

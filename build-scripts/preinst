@@ -1,0 +1,36 @@
+#!/bin/bash
+
+# preinst script for Git-CMSG Linux packages (.deb, .rpm)
+
+# This script runs BEFORE the new package files are installed.
+# Its purpose is to clean up potential old files from previous installations
+# (e.g., if installed manually or by an older package version).
+
+# Exit immediately if a command exits with a non-zero status.
+set -e
+
+# مسیر فایل اجرایی که توسط نسخه های قبلی یا روش های دستی نصب شده است
+# این فرض می کند که /usr/bin مسیر نصب استاندارد پکیج ما است.
+EXECUTABLE_PATH="/usr/bin/git-cmsg"
+
+echo "Git-CMSG preinst script: Checking for old executable..."
+
+# بررسی اگر فایل اجرایی در مسیر مشخص شده وجود دارد و یک فایل است
+if [ -f "$EXECUTABLE_PATH" ]; then
+  echo "Removing old executable: $EXECUTABLE_PATH"
+  # از دستور rm برای حذف فایل استفاده می کنیم. مدیر پکیج اسکریپت preinst را با دسترسی root اجرا می کند.
+  rm "$EXECUTABLE_PATH"
+fi
+
+# اگر در آینده فایل های تنظیمات یا دیتای دیگری اضافه کردید که نیاز به پاکسازی دارند،
+# می توانید دستورات حذف آنها را در اینجا اضافه کنید.
+# مثال:
+# CONFIG_DIR="/etc/git-cmsg" # مسیر مثال برای پوشه تنظیمات
+# if [ -d "$CONFIG_DIR" ]; then
+#   echo "Removing old config directory: $CONFIG_DIR"
+#   rm -rf "$CONFIG_DIR"
+# fi
+
+echo "Git-CMSG preinst script: Cleanup complete."
+
+exit 0 # خروج موفقیت آمیز برای نشان دادن به مدیر پکیج

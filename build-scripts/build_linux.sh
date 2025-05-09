@@ -19,6 +19,9 @@ if [ -z "$VERSION" ]; then
   exit 1
 fi
 
+# تعریف مسیر پوشه releases برای ذخیره خروجی نهایی
+RELEASES_DIR="releases"
+
 echo "شروع فرآیند ساخت پکیج های لینوکس برای نسخه: $VERSION"
 
 # 1. بررسی پیش نیازها
@@ -44,9 +47,76 @@ echo "ساخت فایل اجرایی با PyInstaller..."
 pyinstaller --onefile git_cmsg.py
 echo "ساخت PyInstaller کامل شد."
 
-# 4. ساخت پکیج .deb با FPM
-echo "ساخت پکیج .deb..."
-# ${VERSION#v} برای حذف حرف 'v' از ابتدای رشته نسخه (مثال: v0.2.0 به 0.2.0)
+# --- 4. ایجاد ساختار موقت برای اسکریپت های نصاب لینوکس ---
+echo "Creating temporary structure for Linux installer scripts..."
+LINUX_PACKAGING_DIR="linux_packaging"
+LINUX_SCRIPTS_DIR="$LINUX_PACKAGING_DIR/scripts"
+
+# پاکسازی پوشه موقت قبلی (اگر وجود دارد)
+rm -rf "$LINUX_PACKAGING_DIR"
+
+# ایجاد دایرکتوری های لازم
+mkdir -p "$LINUX_SCRIPTS_DIR"
+
+# --- 5. ایجاد فایل اسکریپت preinst در پوشه موقت ---
+echo "Creating preinst script file in temporary directory..."
+
+# تعریف مسیر فایل preinst در پوشه موقت
+PREINST_SCRIPT="$LINUX_SCRIPTS_DIR/preinst"
+
+# نوشتن محتوای اسکریپت preinst (مطابق بخش 1 بالا) در فایل
+cat <<EOF > "$PREINST_SCRIPT"
+#!/bin/bash
+
+# preinst script for Git-CMSG Linux packages (.deb, .rpm)
+
+# This script runs BEFORE the new package files are installed.
+# Its purpose is to clean up potential old files from previous installations
+# (e.g., if installed manually or by an older package version).
+
+# Exit immediately if a command exits with a non-zero status.
+set -e
+
+# Path to the executable installed by previous versions or manual methods
+# This assumes /usr/bin is the standard target directory for our package
+EXECUTABLE_PATH="/usr/bin/git-cmsg"
+
+echo "Git-CMSG preinst script: Checking for old executable..."
+
+# Check if the executable exists and is a file, then remove it
+if [ -f "$EXECUTABLE_PATH" ]; then
+  echo "Removing old executable: $EXECUTABLE_PATH"
+  # Use rm directly. Package manager runs preinst with root privileges.
+  rm "$EXECUTABLE_PATH"
+fi
+
+# Could add cleanup for config files here if they were introduced
+# For example:
+# CONFIG_DIR="/etc/git-cmsg" # Example config directory
+# if [ -d "$CONFIG_DIR" ]; then
+#   echo "Removing old config directory: $CONFIG_DIR"
+#   rm -rf "$CONFIG_DIR"
+# fi
+
+echo "Git-CMSG preinst script: Cleanup complete."
+
+exit 0 # Indicate success to the package manager
+EOF
+
+# اجرایی کردن فایل اسکریپت preinst
+chmod +x "$PREINST_SCRIPT"
+
+echo "Preinst script created and made executable."
+
+# --- 6. ایجاد پوشه releases و ساخت پکیج های .deb و .rpm با FPM ---
+echo "Building packages and saving to releases directory..."
+
+# ایجاد پوشه releases اگر وجود ندارد
+mkdir -p "$RELEASES_DIR"
+
+# ساخت پکیج .deb با FPM و ذخیره در releases
+echo "Building .deb package..."
+# ${VERSION#v} برای حذف حرف 'v' از ابتدای رشته نسخه
 fpm -s dir -t deb \
     -n git-cmsg \
     -v ${VERSION#v} \
@@ -56,12 +126,14 @@ fpm -s dir -t deb \
     --license "GPL-3.0" \
     --depends "python3 (>= 3.6)" \
     --depends "git" \
-    dist/git_cmsg=/usr/bin/git-cmsg
+    --before-install "$PREINST_SCRIPT" \
+    dist/git_cmsg=/usr/bin/git-cmsg \
+    --output-path "$RELEASES_DIR/" # ذخیره خروجی در پوشه releases
 
-echo "پکیج .deb ساخته شد."
+echo ".deb package built."
 
-# 5. ساخت پکیج .rpm با FPM
-echo "ساخت پکیج .rpm..."
+# ساخت پکیج .rpm با FPM و ذخیره در releases
+echo "Building .rpm package..."
 fpm -s dir -t rpm \
     -n git-cmsg \
     -v ${VERSION#v} \
@@ -71,17 +143,20 @@ fpm -s dir -t rpm \
     --license "GPL-3.0" \
     --depends "python3 >= 3.6" \
     --depends "git" \
-    dist/git_cmsg=/usr/bin/git-cmsg
+    --before-install "$PREINST_SCRIPT" \
+    dist/git_cmsg=/usr/bin/git-cmsg \
+    --output-path "$RELEASES_DIR/" # ذخیره خروجی در پوشه releases
 
-echo "پکیج .rpm ساخته شد."
+echo ".rpm package built."
 
-# 6. پاکسازی فایل های موقت
-echo "پاکسازی فایل های موقت ساخت..."
+# 7. پاکسازی فایل های موقت
+echo "Cleaning up build artifacts..."
 rm -rf build/
 rm -rf dist/
-# غیرفعال کردن محیط مجازی اگر استفاده شد
+rm -rf "$LINUX_PACKAGING_DIR" # *** پاکسازی پوشه موقت اسکریپت های لینوکس ***
+# Deactivate venv if used
 # deactivate
-echo "پاکسازی کامل شد."
+echo "Cleanup complete."
 
-echo "فرآیند ساخت پکیج های لینوکس به پایان رسید."
-echo "پکیج ها (.deb, .rpm) در دایرکتوری فعلی قرار دارند."
+echo "Linux package build process finished."
+echo "Packages (.deb, .rpm) are in the '$RELEASES_DIR' directory in the project root."
