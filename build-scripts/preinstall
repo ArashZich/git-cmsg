@@ -1,0 +1,36 @@
+#!/bin/bash
+
+# preinstall script for Git-CMSG macOS package
+
+# این اسکریپت قبل از کپی شدن فایل های نسخه جدید اجرا می شود.
+# هدف آن پاکسازی نصب های قبلی در صورت وجود است.
+
+# اگر هر دستوری با خطا مواجه شد، بلافاصله خارج شو
+set -e
+
+# مسیرهای نصب استاندارد که توسط پکیج ما استفاده می شوند.
+# مطمئن شوید که این مسیرها با مسیرهای استفاده شده در build_macos.sh و postinstall هماهنگ هستند.
+LINK_PATH="/usr/local/bin/git-cmsg"
+INSTALL_DIR="/usr/local/lib/git-cmsg" # پوشه اصلی برنامه
+
+echo "Git-CMSG preinstall script: Checking for previous installation..."
+
+# بررسی اگر symbolic link وجود دارد و یک symbolic link است، سپس آن را حذف کن
+# -L برای بررسی symbolic link استفاده می شود
+if [ -L "$LINK_PATH" ]; then
+  echo "Removing old symlink: $LINK_PATH"
+  # از rm مستقیم روی مسیر symbolic link استفاده کن. نصاب با دسترسی sudo اجرا می شود.
+  rm "$LINK_PATH"
+fi
+
+# بررسی اگر پوشه نصب وجود دارد و یک پوشه است، سپس آن را حذف کن
+# از -d برای بررسی پوشه استفاده می شود
+if [ -d "$INSTALL_DIR" ]; then
+  echo "Removing old installation directory: $INSTALL_DIR"
+  # از rm -rf برای حذف پوشه و محتویات آن به صورت بازگشتی و اجباری استفاده کن. نصاب با دسترسی sudo اجرا می شود.
+  rm -rf "$INSTALL_DIR"
+fi
+
+echo "Git-CMSG preinstall script: Cleanup complete."
+
+exit 0 # نشان دهنده موفقیت به نصاب
