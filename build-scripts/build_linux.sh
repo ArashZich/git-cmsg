@@ -127,8 +127,8 @@ fpm -s dir -t deb \
     --depends "python3 (>= 3.6)" \
     --depends "git" \
     --before-install "$PREINST_SCRIPT" \
-    dist/git_cmsg=/usr/bin/git-cmsg \
-    --output-path "$RELEASES_DIR/" # ذخیره خروجی در پوشه releases
+    --package "$RELEASES_DIR/git-cmsg_${VERSION#v}_amd64.deb" \
+    dist/git_cmsg=/usr/bin/git-cmsg
 
 echo ".deb package built."
 
@@ -144,8 +144,8 @@ fpm -s dir -t rpm \
     --depends "python3 >= 3.6" \
     --depends "git" \
     --before-install "$PREINST_SCRIPT" \
-    dist/git_cmsg=/usr/bin/git-cmsg \
-    --output-path "$RELEASES_DIR/" # ذخیره خروجی در پوشه releases
+    --package "$RELEASES_DIR/git-cmsg-${VERSION#v}-1.x86_64.rpm" \
+    dist/git_cmsg=/usr/bin/git-cmsg
 
 echo ".rpm package built."
 
@@ -153,7 +153,7 @@ echo ".rpm package built."
 echo "Cleaning up build artifacts..."
 rm -rf build/
 rm -rf dist/
-rm -rf "$LINUX_PACKAGING_DIR" # *** پاکسازی پوشه موقت اسکریپت های لینوکس ***
+rm -rf "$LINUX_PACKAGING_DIR" # پاکسازی پوشه موقت اسکریپت های لینوکس
 # Deactivate venv if used
 # deactivate
 echo "Cleanup complete."
